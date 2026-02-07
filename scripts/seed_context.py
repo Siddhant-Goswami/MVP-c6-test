@@ -18,20 +18,22 @@ def seed():
 
     client.table("learning_context").upsert({
         "id": 1,
-        "goals": "Building AI-powered applications, improving Python architecture skills",
+        "goals": "Agentic coding workflows and tooling, AI/ML engineering best practices, LLM economics and scaling, CLI-first development patterns, strategic implications of AI for businesses",
         "digest_format": "daily",
         "methodology": {
             "style": "practical",
-            "depth": "intermediate",
+            "depth": "advanced",
             "consumption": "30min",
         },
         "skill_levels": {
             "Python": "advanced",
-            "Machine Learning": "intermediate",
+            "AI/ML Engineering": "advanced",
+            "Agentic Coding": "intermediate",
             "System Design": "intermediate",
+            "LLM APIs": "advanced",
         },
         "time_availability": "30 minutes per day",
-        "project_context": "",
+        "project_context": "Building AI-powered developer tools. Interested in cutting-edge agentic coding, compound AI systems, and practical workflows over theoretical content.",
     }).execute()
 
     print("Learning context seeded successfully!")

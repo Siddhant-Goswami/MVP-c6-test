@@ -30,6 +30,7 @@ class Settings(BaseSettings):
 
     # Sources (comma-separated)
     twitter_list_urls: str = ""
+    twitter_handles: str = ""
     rss_feed_urls: str = ""
     youtube_channel_ids: str = ""
 
@@ -41,6 +42,10 @@ class Settings(BaseSettings):
     @property
     def twitter_lists(self) -> list[str]:
         return [u.strip() for u in self.twitter_list_urls.split(",") if u.strip()]
+
+    @property
+    def twitter_handle_list(self) -> list[str]:
+        return [h.strip().lstrip("@") for h in self.twitter_handles.split(",") if h.strip()]
 
     @property
     def rss_feeds(self) -> list[str]:
