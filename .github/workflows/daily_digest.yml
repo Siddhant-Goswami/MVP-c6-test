@@ -32,6 +32,7 @@ jobs:
           DIGEST_FROM_EMAIL: ${{ secrets.DIGEST_FROM_EMAIL }}
           FEEDBACK_API_URL: ${{ secrets.FEEDBACK_API_URL }}
           TWITTER_LIST_URLS: ${{ secrets.TWITTER_LIST_URLS }}
+          TWITTER_HANDLES: ${{ secrets.TWITTER_HANDLES }}
           RSS_FEED_URLS: ${{ secrets.RSS_FEED_URLS }}
           YOUTUBE_CHANNEL_IDS: ${{ secrets.YOUTUBE_CHANNEL_IDS }}
           STREAMLIT_APP_URL: ${{ secrets.STREAMLIT_APP_URL }}
