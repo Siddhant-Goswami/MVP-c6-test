@@ -58,6 +58,11 @@ CREATE TABLE IF NOT EXISTS digest_log (
     items_emailed INTEGER NOT NULL DEFAULT 0,
     precision_rate NUMERIC(5, 2),
     error_message TEXT,
+    cost_openai_usd NUMERIC(8, 4) DEFAULT 0,
+    cost_apify_usd NUMERIC(8, 4) DEFAULT 0,
+    cost_resend_usd NUMERIC(8, 4) DEFAULT 0,
+    cost_total_usd NUMERIC(8, 4) DEFAULT 0,
+    openai_tokens_used INTEGER DEFAULT 0,
     started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     completed_at TIMESTAMPTZ
 );

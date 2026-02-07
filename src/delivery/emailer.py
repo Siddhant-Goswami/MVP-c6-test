@@ -4,11 +4,12 @@ from datetime import date
 import resend
 
 from src.config import get_settings
+from src.models import CostTracker
 
 logger = logging.getLogger(__name__)
 
 
-def send_digest_email(html: str, digest_date: date) -> bool:
+def send_digest_email(html: str, digest_date: date, tracker: CostTracker | None = None) -> bool:
     """Send the digest email via Resend."""
     s = get_settings()
     resend.api_key = s.resend_api_key
@@ -23,6 +24,8 @@ def send_digest_email(html: str, digest_date: date) -> bool:
             "html": html,
         })
         logger.info(f"Digest email sent: {response}")
+        if tracker:
+            tracker.add_resend_email()
         return True
     except Exception as e:
         logger.error(f"Failed to send digest email: {e}")

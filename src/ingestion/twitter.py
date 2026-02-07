@@ -4,12 +4,12 @@ from datetime import datetime, timedelta, timezone
 from apify_client import ApifyClient
 
 from src.config import get_settings
-from src.models import ContentItem, ContentSource
+from src.models import ContentItem, ContentSource, CostTracker
 
 logger = logging.getLogger(__name__)
 
 
-def fetch_twitter_items(list_urls: list[str] | None = None, handles: list[str] | None = None, hours_back: int = 24) -> list[ContentItem]:
+def fetch_twitter_items(list_urls: list[str] | None = None, handles: list[str] | None = None, hours_back: int = 24, tracker: CostTracker | None = None) -> list[ContentItem]:
     """Fetch recent tweets from Twitter lists and individual accounts using Apify tweet-scraper."""
     s = get_settings()
     urls = list_urls or s.twitter_lists
@@ -43,6 +43,13 @@ def fetch_twitter_items(list_urls: list[str] | None = None, handles: list[str] |
     try:
         logger.info(f"Starting Apify tweet-scraper: {len(urls)} lists, {len(handle_list)} handles")
         run = client.actor("apidojo/tweet-scraper").call(run_input=run_input)
+
+        # Track Apify cost
+        apify_cost = run.get("usageTotalUsd", 0)
+        if tracker and apify_cost:
+            tracker.add_apify_cost(apify_cost)
+            logger.info(f"Apify run cost: ${apify_cost:.4f}")
+
         dataset_items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
         logger.info(f"Apify returned {len(dataset_items)} raw tweets")
 

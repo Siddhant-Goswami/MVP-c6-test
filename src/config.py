@@ -37,6 +37,10 @@ class Settings(BaseSettings):
     # Streamlit
     streamlit_app_url: str = ""
 
+    # Budget limits
+    daily_budget_usd: float = 1.00
+    monthly_budget_usd: float = 15.00
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
     @property

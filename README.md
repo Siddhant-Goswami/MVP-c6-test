@@ -6,12 +6,14 @@ A personal content curation system that ingests from Twitter, newsletters (RSS),
 
 ```
 GitHub Actions (daily 6 AM UTC)
+  -> Check daily/monthly budget limits
   -> Load your Learning Context from Supabase
   -> Ingest from Twitter (Apify) + RSS feeds + GitHub Trending
   -> Deduplicate by URL
   -> Score each item 0-10 with GPT-4o against your goals
   -> Build HTML email: Top 3 Must-Reads + remaining (score >= 5.0)
   -> Send via Resend
+  -> Track costs per service (OpenAI, Apify, Resend)
   -> Track precision from previous feedback
 ```
 
@@ -34,8 +36,8 @@ Each email includes **Useful / Not Useful** buttons per item. Clicking them reco
 
 ```
 src/
-  config.py              # Pydantic settings, env vars
-  models.py              # ContentItem, ScoredItem, LearningContext
+  config.py              # Pydantic settings, env vars, budget limits
+  models.py              # ContentItem, ScoredItem, LearningContext, CostTracker
   db.py                  # Supabase CRUD helpers
   pipeline.py            # Main daily orchestrator
   ingestion/
@@ -57,7 +59,8 @@ src/
 streamlit_app/
   app.py                 # Learning Context web form
 scripts/
-  init_db.sql            # Supabase table creation
+  init_db.sql            # Supabase table creation (includes cost columns)
+  migrate_add_costs.sql  # Migration: add cost columns to existing digest_log
   seed_context.py        # Seed default learning context
 tests/
   test_ingestion.py
@@ -84,6 +87,8 @@ Go to your Supabase project -> SQL Editor -> run the contents of `scripts/init_d
 
 This creates 5 tables: `learning_context`, `learning_context_history`, `digest_items`, `feedback`, `digest_log`.
 
+**Existing databases**: Run `scripts/migrate_add_costs.sql` to add cost tracking columns to `digest_log`.
+
 ### 3. Configure environment
 
 ```bash
@@ -108,6 +113,8 @@ Fill in your keys:
 | `RSS_FEED_URLS` | Comma-separated RSS feed URLs |
 | `YOUTUBE_CHANNEL_IDS` | Comma-separated YouTube channel IDs (optional) |
 | `STREAMLIT_APP_URL` | Deployed Streamlit app URL |
+| `DAILY_BUDGET_USD` | Max cost per day (default: `1.00`) |
+| `MONTHLY_BUDGET_USD` | Max cost per month (default: `15.00`) |
 
 ### 4. Seed learning context
 
@@ -160,7 +167,7 @@ Add all env vars as **repository secrets** under Settings -> Secrets -> Actions.
 | `learning_context_history` | Snapshots on every update |
 | `digest_items` | Scored items per digest (unique on url + date) |
 | `feedback` | User responses (useful / not_useful) |
-| `digest_log` | Pipeline run tracking, precision rates |
+| `digest_log` | Pipeline run tracking, precision rates, cost per run |
 
 ## API Endpoints
 
@@ -171,11 +178,30 @@ Add all env vars as **repository secrets** under Settings -> Secrets -> Actions.
 | `GET` | `/stats?days=7` | Recent precision rates |
 | `POST` | `/trigger` | Manual pipeline trigger |
 
+## Cost Tracking & Budget Limits
+
+The pipeline tracks costs for all three paid services (OpenAI, Apify, Resend) and enforces configurable budget limits to prevent runaway spending.
+
+| Service | Unit | Cost |
+|---------|------|------|
+| OpenAI GPT-4o input | 1K tokens | $0.0025 |
+| OpenAI GPT-4o output | 1K tokens | $0.01 |
+| Apify tweet-scraper | per run | ~$0.10-0.50 |
+| Resend | per email | $0.00028 (after free tier) |
+
+**Budget enforcement** happens at pipeline start:
+- If **monthly budget** is exceeded, the entire pipeline is skipped
+- If remaining monthly budget can't cover an Apify run (~$0.50), Twitter ingestion is skipped
+- If **daily budget** is exceeded, OpenAI scoring is skipped
+
+Costs are stored per run in `digest_log` and visible in the Streamlit dashboard.
+
 ## Key Design Decisions
 
 - **Feedback via GET requests** — email clients block POST/JS, so feedback links are simple GET URLs
 - **Graceful degradation** — if any source fails, the pipeline continues with remaining sources
 - **Batch scoring** — 12 items per GPT-4o call to reduce API costs (~$0.02-0.05/day)
+- **Budget gates** — daily and monthly limits prevent cost overruns, with progressive degradation (skip Twitter first, then scoring)
 - **Lazy config loading** — `get_settings()` with `@lru_cache` so tests run without env vars
 - **RT filtering** — retweets are excluded from scoring to reduce noise
 - **Precision monitoring** — alerts via email if precision drops below 60% for 3 consecutive days

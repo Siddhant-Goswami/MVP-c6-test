@@ -4,14 +4,14 @@ import logging
 from openai import OpenAI
 
 from src.config import get_settings
-from src.models import ContentItem, ScoredItem, LearningContext
+from src.models import ContentItem, ScoredItem, LearningContext, CostTracker
 
 logger = logging.getLogger(__name__)
 
 BATCH_SIZE = 12
 
 
-def score_items(items: list[ContentItem], context: LearningContext) -> list[ScoredItem]:
+def score_items(items: list[ContentItem], context: LearningContext, tracker: CostTracker | None = None) -> list[ScoredItem]:
     """Score content items against the learning context using GPT-4o."""
     if not items:
         return []
@@ -23,7 +23,7 @@ def score_items(items: list[ContentItem], context: LearningContext) -> list[Scor
     for i in range(0, len(items), BATCH_SIZE):
         batch = items[i:i + BATCH_SIZE]
         try:
-            batch_scored = _score_batch(client, batch, context)
+            batch_scored = _score_batch(client, batch, context, tracker)
             scored.extend(batch_scored)
         except Exception as e:
             logger.error(f"Error scoring batch {i // BATCH_SIZE + 1}: {e}")
@@ -43,7 +43,7 @@ def score_items(items: list[ContentItem], context: LearningContext) -> list[Scor
     return scored
 
 
-def _score_batch(client: OpenAI, items: list[ContentItem], context: LearningContext) -> list[ScoredItem]:
+def _score_batch(client: OpenAI, items: list[ContentItem], context: LearningContext, tracker: CostTracker | None = None) -> list[ScoredItem]:
     """Score a batch of items with a single GPT-4o call."""
     system_prompt = _build_system_prompt(context)
     user_prompt = _build_user_prompt(items)
@@ -57,6 +57,11 @@ def _score_batch(client: OpenAI, items: list[ContentItem], context: LearningCont
         response_format={"type": "json_object"},
         temperature=0.3,
     )
+
+    # Track token usage
+    if tracker and response.usage:
+        tracker.add_openai_usage(response.usage.prompt_tokens, response.usage.completion_tokens)
+        logger.debug(f"OpenAI tokens: {response.usage.prompt_tokens} prompt + {response.usage.completion_tokens} completion")
 
     content = response.choices[0].message.content
     result = json.loads(content)

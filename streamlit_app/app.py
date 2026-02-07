@@ -129,8 +129,12 @@ def main():
     client = get_supabase()
     logs = client.table("digest_log").select("*").order("digest_date", desc=True).limit(7).execute()
     if logs.data:
+        # Monthly cost summary
+        monthly_total = sum(float(l.get("cost_total_usd", 0) or 0) for l in logs.data)
+        st.metric("Running Cost (last 7 runs)", f"${monthly_total:.4f}")
+
         for log in logs.data:
-            col1, col2, col3, col4 = st.columns(4)
+            col1, col2, col3, col4, col5 = st.columns(5)
             with col1:
                 st.metric("Date", log["digest_date"])
             with col2:
@@ -140,6 +144,9 @@ def main():
                 st.metric("Precision", f"{precision}%" if precision else "N/A")
             with col4:
                 st.metric("Status", log.get("status", "unknown"))
+            with col5:
+                cost = float(log.get("cost_total_usd", 0) or 0)
+                st.metric("Cost", f"${cost:.4f}")
     else:
         st.info("No digest history yet. The first digest will run at 6 AM UTC.")
 

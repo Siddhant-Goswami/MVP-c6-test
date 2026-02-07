@@ -125,6 +125,11 @@ def upsert_digest_log(
     items_emailed: int = 0,
     precision_rate: Optional[float] = None,
     error_message: Optional[str] = None,
+    cost_openai_usd: float = 0,
+    cost_apify_usd: float = 0,
+    cost_resend_usd: float = 0,
+    cost_total_usd: float = 0,
+    openai_tokens_used: int = 0,
     client: Optional[Client] = None,
 ) -> None:
     client = client or get_client()
@@ -134,6 +139,11 @@ def upsert_digest_log(
         "items_ingested": items_ingested,
         "items_scored": items_scored,
         "items_emailed": items_emailed,
+        "cost_openai_usd": cost_openai_usd,
+        "cost_apify_usd": cost_apify_usd,
+        "cost_resend_usd": cost_resend_usd,
+        "cost_total_usd": cost_total_usd,
+        "openai_tokens_used": openai_tokens_used,
     }
     if precision_rate is not None:
         row["precision_rate"] = float(precision_rate)
@@ -159,6 +169,38 @@ def get_precision_stats(days: int = 7, client: Optional[Client] = None) -> list[
         .execute()
     )
     return result.data
+
+
+def get_daily_cost(target_date: date, client: Optional[Client] = None) -> float:
+    """Get total cost for a specific date."""
+    client = client or get_client()
+    result = (
+        client.table("digest_log")
+        .select("cost_total_usd")
+        .eq("digest_date", target_date.isoformat())
+        .execute()
+    )
+    if result.data:
+        return float(result.data[0].get("cost_total_usd", 0) or 0)
+    return 0.0
+
+
+def get_monthly_cost(year: int, month: int, client: Optional[Client] = None) -> float:
+    """Sum cost_total_usd for all runs in a given month."""
+    client = client or get_client()
+    start = date(year, month, 1).isoformat()
+    if month == 12:
+        end = date(year + 1, 1, 1).isoformat()
+    else:
+        end = date(year, month + 1, 1).isoformat()
+    result = (
+        client.table("digest_log")
+        .select("cost_total_usd")
+        .gte("digest_date", start)
+        .lt("digest_date", end)
+        .execute()
+    )
+    return sum(float(r.get("cost_total_usd", 0) or 0) for r in result.data)
 
 
 def calculate_precision_for_date(digest_date: date, client: Optional[Client] = None) -> Optional[float]:
