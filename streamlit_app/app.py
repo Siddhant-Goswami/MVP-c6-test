@@ -1,6 +1,5 @@
 import streamlit as st
 from supabase import create_client
-import json
 from datetime import datetime
 
 st.set_page_config(page_title="Learning Context", page_icon="📚", layout="centered")
@@ -21,12 +20,10 @@ def load_context():
 
 def save_context(data: dict):
     client = get_supabase()
-    # Save history snapshot
     current = load_context()
     client.table("learning_context_history").insert({
         "snapshot": current,
     }).execute()
-    # Update
     data["updated_at"] = datetime.utcnow().isoformat()
     client.table("learning_context").update(data).eq("id", 1).execute()
 
@@ -40,6 +37,34 @@ def main():
         st.error("No learning context found. Run seed_context.py first.")
         return
 
+    # --- Skill removal (outside the form) ---
+    skill_levels = dict(ctx.get("skill_levels", {}))
+    st.subheader("Current Skills")
+    if skill_levels:
+        for skill, level in list(skill_levels.items()):
+            col_s, col_l, col_r = st.columns([3, 3, 1])
+            with col_s:
+                st.text(skill)
+            with col_l:
+                st.text(level)
+            with col_r:
+                if st.button("🗑️", key=f"remove_{skill}"):
+                    del skill_levels[skill]
+                    save_context({
+                        "goals": ctx["goals"],
+                        "digest_format": ctx["digest_format"],
+                        "methodology": ctx["methodology"],
+                        "skill_levels": skill_levels,
+                        "time_availability": ctx["time_availability"],
+                        "project_context": ctx["project_context"],
+                    })
+                    st.rerun()
+    else:
+        st.caption("No skills added yet.")
+
+    st.divider()
+
+    # --- Main form ---
     with st.form("learning_context_form"):
         st.subheader("Goals")
         goals = st.text_area(
@@ -61,26 +86,10 @@ def main():
         with col3:
             consumption = st.text_input("Daily consumption time", value=methodology.get("consumption", "30min"))
 
-        st.subheader("Skill Levels")
-        st.caption("Add skills and their current levels (e.g., Python: advanced, Rust: beginner)")
-        skill_levels = ctx.get("skill_levels", {})
-
-        # Display existing skills
-        skills_to_remove = []
-        for skill, level in skill_levels.items():
-            col_s, col_l, col_r = st.columns([3, 3, 1])
-            with col_s:
-                st.text(skill)
-            with col_l:
-                st.text(level)
-            with col_r:
-                if st.form_submit_button(f"🗑️", key=f"remove_{skill}"):
-                    skills_to_remove.append(skill)
-
-        # Add new skill
+        st.subheader("Add New Skill")
         col_ns, col_nl = st.columns(2)
         with col_ns:
-            new_skill = st.text_input("New skill name", key="new_skill")
+            new_skill = st.text_input("Skill name", key="new_skill")
         with col_nl:
             new_level = st.selectbox("Level", ["beginner", "intermediate", "advanced"], key="new_level")
 
@@ -99,7 +108,7 @@ def main():
         submitted = st.form_submit_button("💾 Save Learning Context", type="primary", use_container_width=True)
 
         if submitted:
-            updated_skills = {k: v for k, v in skill_levels.items() if k not in skills_to_remove}
+            updated_skills = dict(skill_levels)
             if new_skill.strip():
                 updated_skills[new_skill.strip()] = new_level
 
@@ -114,7 +123,7 @@ def main():
             st.success("Learning context saved!")
             st.rerun()
 
-    # Digest history
+    # --- Digest history ---
     st.divider()
     st.subheader("📊 Recent Digests")
     client = get_supabase()
